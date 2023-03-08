@@ -1,0 +1,46 @@
+#!/bin/bash
+
+ERR="false"
+delete=""
+
+while IFS="," read -r name passwd gecos remove; do
+    if ! [[ "$name" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
+	echo "error: $name" >&2
+	ERR="true"
+#    else
+#        echo "$name $passwd $gecos $remove" >&2
+    fi
+done < "$1"
+
+
+
+if test $ERR = "false"; then
+    echo "info: input file ok"
+    echo
+    echo "info: applying changes ..."
+    test -f input.new && rm input.new
+    while IFS="," read -r name passwd gecos remove; do
+	if test -n "$remove"; then
+	    if deluser --backup --remove-home --backup-to .  "$name"; then
+		echo "info: remove $name"
+	    else
+		if ! test $? = 2; then
+		    echo "$name,$passwd,$gecos,$delete" >> input.new
+		else
+		    echo "error: $name does not exist" >&2
+		fi
+	    fi
+	else
+	    echo "$name:$passwd:::$gecos:/home/$name:/usr/bin/bash" |newusers
+	    echo "$name,$passwd,$gecos,$delete" >> input.new
+	    echo "info: created $name"
+	fi    
+    done < "$1"
+    cp input.new "$1"
+else
+    echo "error: es gab fehler in den namen" >&2
+fi
+
+
+#uhu:Gaga2::::/home/uhu:/usr/bin/bash
+#miau:kaTze::::/home/miau:/usr/bin/bash
