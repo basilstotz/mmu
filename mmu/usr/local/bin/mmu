@@ -25,13 +25,18 @@ while IFS="," read -r name passwd gecos remove; do
     notempty=true
     if test -n "$name"; then
 	if ! exists "$name"; then
-	    if test -z "$passwd" -o -z "$gecos"; then
-		echo "error: empty passwd/gecos fields are not allowed"
+	    if test -n "$remove"; then
+		echo "error: try to remove $name, but it does not exit"
 		ERR="true"
-	    else
-		if ! [[ "$name" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
-		    echo "error: username \"$name\" is not allowed" >&2
+	    else	
+		if test -z "$passwd" -o -z "$gecos"; then
+		    echo "error: empty passwd/gecos fields are not allowed"
 		    ERR="true"
+		else
+		    if ! [[ "$name" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
+			echo "error: username \"$name\" is not allowed" >&2
+			ERR="true"
+		    fi
 		fi
 	    fi
 	fi
