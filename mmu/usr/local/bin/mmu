@@ -1,13 +1,20 @@
 #!/bin/bash
 
 if test -z "$1";then
-   echo "usage: $(basename $0) <file>.csv"
+   echo "usage: $(basename "$0") <file>.csv"
    exit 1
 fi
 if ! test -f "$1";then
    echo "error: file \"$1\" does not exist"
    exit 1
 fi
+
+exists(){
+    getent passwd | grep -q "^$1:.*"
+    return $? 
+}
+
+
 
 ERR="false"
 delete=""
@@ -16,14 +23,21 @@ notempty=false
 
 while IFS="," read -r name passwd gecos remove; do
     notempty=true
-    if test -z "$name" -o -z "$passwd" -o -z "$gecos"; then
-	echo "error: empty fields are not allowed"
-	ERR="true"
-    else
-	if ! [[ "$name" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
-	    echo "error: username \"$name\" is not allowed" >&2
-	    ERR="true"
+    if test -n "$name"; then
+	if ! exists "$name"; then
+	    if test -z "$passwd" -o -z "$gecos"; then
+		echo "error: empty passwd/gecos fields are not allowed"
+		ERR="true"
+	    else
+		if ! [[ "$name" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
+		    echo "error: username \"$name\" is not allowed" >&2
+		    ERR="true"
+		fi
+	    fi
 	fi
+    else
+	echo "error: userid kan not be empty"
+	ERR=true
     fi
 done < "$1"
 
@@ -40,22 +54,35 @@ if test $ERR = "false"; then
     echo "info: input file ok"
     echo
     echo "info: applying changes ..."
+    cp "$1" "$1_$(date +%s)"
     test -f input.new && rm input.new
+    touch input.new
     while IFS="," read -r name passwd gecos remove; do
 	if test -n "$remove"; then
-	    if deluser --backup --remove-home --backup-to .  "$name"; then
-		echo "info: remove $name"
-	    else
-		if ! test $? = 2; then
-		    echo "$name,$passwd,$gecos,$delete" >> input.new
+	    if exists "$name"; then
+		if deluser --backup --remove-home --backup-to .  "$name"; then
+		    echo "info: remove $name"
 		else
-		    echo "error: $name does not exist" >&2
+		    echo "an error ocurred, while removing $name" >&2
+		    echo "$name,$passwd,$gecos,$delete" >> input.new
 		fi
+	    else
+		echo "error: $name does not exist" >&2
 	    fi
 	else
-	    echo "$name:$passwd:::$gecos:/home/$name:/usr/bin/bash" |newusers
-	    echo "$name,$passwd,$gecos,$delete" >> input.new
-	    echo "info: created $name"
+	    if exists "$name";then
+		if test -n "$passwd" -o -n "$gecos"; then
+	            echo "$name:$passwd:::$gecos:/home/$name:/usr/bin/bash" |newusers
+   	            echo "info: modified $name"
+		fi
+	    else
+		if test -n "$passwd"; then
+	            echo "$name:$passwd:::$gecos:/home/$name:/usr/bin/bash" |newusers
+		    echo "info: created $name"
+		fi
+	    fi
+	    
+	    echo "$name,,," >> input.new
 	fi    
     done < "$1"
     cp input.new "$1"
