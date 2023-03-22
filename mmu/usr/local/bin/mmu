@@ -1,16 +1,38 @@
 #!/bin/bash
 
+if test -z "$1";then
+   echo "usage: $(basename $0) <file>.csv"
+   exit 1
+fi
+if ! test -f "$1";then
+   echo "error: file \"$1\" does not exist"
+   exit 1
+fi
+
 ERR="false"
 delete=""
+notempty=false
+
 
 while IFS="," read -r name passwd gecos remove; do
-    if ! [[ "$name" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
-	echo "error: $name" >&2
+    notempty=true
+    if test -z "$name" -o -z "$passwd" -o -z "$gecos"; then
+	echo "error: empty fields are not allowed"
 	ERR="true"
-#    else
-#        echo "$name $passwd $gecos $remove" >&2
+    else
+	if ! [[ "$name" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
+	    echo "error: username \"$name\" is not allowed" >&2
+	    ERR="true"
+	fi
     fi
 done < "$1"
+
+if ! $notempty ; then
+    echo "error: file is empty"
+    exit 1
+fi
+
+echo
 
 
 
@@ -38,6 +60,7 @@ if test $ERR = "false"; then
     done < "$1"
     cp input.new "$1"
 else
+    echo 
     echo "error: es gab fehler in den namen" >&2
 fi
 
