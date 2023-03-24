@@ -69,7 +69,7 @@ if test $ERR = "false"; then
 		    echo "info: remove $name"
 		else
 		    echo "an error ocurred, while removing $name" >&2
-		    echo "$name,$passwd,$gecos,$delete" >> input.new
+		    echo "$name,$passwd,$gecos,$remove" >> input.new
 		fi
 	    else
 		echo "error: $name does not exist" >&2

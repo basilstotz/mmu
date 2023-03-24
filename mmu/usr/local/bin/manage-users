@@ -1,0 +1,99 @@
+#!/bin/bash
+
+if test -z "$1";then
+   echo "usage: $(basename "$0") <file>.csv"
+   exit 1
+fi
+if ! test -f "$1";then
+   echo "error: file \"$1\" does not exist"
+   exit 1
+fi
+
+exists(){
+    getent passwd | grep -q "^$1:.*"
+    return $? 
+}
+
+
+ERR="false"
+
+while IFS="," read -r uid passwd name type group; do
+    if test -n "$uid"; then
+       if test -n "$passwd"; then
+	   if ! [[ "$uid" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
+	       echo "error: username \"$uid\" is not allowed" >&2
+	       ERR="true"
+	   fi
+       else
+	   echo "error: empty passwd field is not allowed"
+	   ERR="true"
+       fi
+    else
+	echo "error: userid kan not be empty"
+	ERR=true
+    fi
+done < "$1"
+
+echo " ">alle.txt
+getent passwd | while IFS=":" read -r uider passwd nuid rest; do
+    if test $nuid -ge 1001 -a $nuid -lt 5000;then
+	#echo $nuid $uider
+	echo "$uider">>alle.txt
+    fi
+done
+
+
+ALLE=$(cat alle.txt)
+
+echo $ALLE
+echo
+
+if test $ERR = "false"; then
+    echo "info: input file ok"
+    echo
+    echo "info: applying changes ..."
+
+    PFAD="/var/ltsp/users/"
+    if ! test -d $PFAD; then
+	mkdir -p $PFAD
+	chmod 700 $PFAD
+    fi
+
+    
+    while IFS="," read -r uid passwd name type group; do
+	if false; then
+       if ! exists "$uid";then
+	   echo "$uid:$passwd:::$name,$type,$group:/home/$uid:/usr/bin/bash" |newusers
+	   echo "$uid:$passwd:$name:$type:$group" > $PFAD/$uid
+	   echo "info: created $uid for $name"
+       else
+	   if test -f  $PFAD/$uid; then
+	       SIGN_ALT=$(cat  $PFAD/$uid)
+	   else
+	       SIGN_ALT=""
+	   fi
+	   SIGN="$uid:$passwd:$name:$type:$group"
+	   if ! test "$SIGN" = "$SIGN_ALT"; then
+	       echo "$uid:$passwd:::$name,$type,$group:/home/$uid:/usr/bin/bash" |newusers
+	       echo "$SIGN" >  $PFAD/$uid
+	       echo "info: mdofied $uid for $name"
+	   fi
+       fi
+	fi
+	
+       ALLE=$( echo "$ALLE"|sed -e"s/ $uid / /g") 
+    done < "$1"
+    echo "***************************"
+    echo $ALLE
+    
+
+    
+    
+else
+    echo 
+    echo "error: es gab fehler in den namen" >&2
+fi
+
+
+#uhu:Gaga2::::/home/uhu:/usr/bin/bash
+#miau:kaTze::::/home/miau:/usr/bin/bash
