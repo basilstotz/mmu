@@ -19,15 +19,20 @@ ERR="false"
 
 while IFS="," read -r uid passwd name type group; do
     if test -n "$uid"; then
-       if test -n "$passwd"; then
-	   if ! [[ "$uid" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
-	       echo "error: username \"$uid\" is not allowed" >&2
-	       ERR="true"
-	   fi
-       else
-	   echo "error: empty passwd field is not allowed"
-	   ERR="true"
-       fi
+	if [[ "$type" =~ ^(admin|teacher|student)$ ]]; then
+	    if [[ "$passwd" =~ ^.{4,16}$ ]]; then
+		if ! [[ "$uid" =~ ^[abcdefghijklmnopqrstuvwxyz_][abcdefghijklmnopqrstuvwxyz0123456789._]{0,31}$ ]]; then 
+		    echo "error: username \"$uid\" is not allowed" >&2
+		    ERR="true"
+		fi
+	    else
+		echo "error: $uid"
+		ERR="true"
+	    fi
+	else
+	    echo "error: $uid type not correct"
+	    ERR=true
+	fi
     else
 	echo "error: userid kan not be empty"
 	ERR=true
@@ -42,16 +47,8 @@ getent passwd | while IFS=":" read -r uider passwd nuid rest; do
     fi
 done
 
-
-ALLE=$(cat alle.txt)
-
-echo $ALLE
-echo
-
 if test $ERR = "false"; then
     echo "info: input file ok"
-    echo
-    echo "info: applying changes ..."
 
     PFAD="/var/ltsp/users/"
     if ! test -d $PFAD; then
@@ -59,33 +56,42 @@ if test $ERR = "false"; then
 	chmod 700 $PFAD
     fi
 
+    echo -n "" > newusers.cmd
+    
     
     while IFS="," read -r uid passwd name type group; do
-	if false; then
+       LINE="$uid:$passwd:::$name,$type,$group:/home/$uid:/usr/bin/bash"
        if ! exists "$uid";then
-	   echo "$uid:$passwd:::$name,$type,$group:/home/$uid:/usr/bin/bash" |newusers
-	   echo "$uid:$passwd:$name:$type:$group" > $PFAD/$uid
-	   echo "info: created $uid for $name"
+	   echo  "$LINE" >> newusers.cmd
+	   echo "$LINE" > $PFAD/$uid
+	   echo "      create $uid"
        else
 	   if test -f  $PFAD/$uid; then
-	       SIGN_ALT=$(cat  $PFAD/$uid)
+	       LINE_ALT=$(cat  $PFAD/$uid)
 	   else
-	       SIGN_ALT=""
+	       LINE_ALT=""
 	   fi
-	   SIGN="$uid:$passwd:$name:$type:$group"
-	   if ! test "$SIGN" = "$SIGN_ALT"; then
-	       echo "$uid:$passwd:::$name,$type,$group:/home/$uid:/usr/bin/bash" |newusers
-	       echo "$SIGN" >  $PFAD/$uid
-	       echo "info: mdofied $uid for $name"
+	   if ! test "$LINE" = "$LINE_ALT"; then
+	       echo "$LINE" >> newusers.cmd
+	       echo "$LINE" >  $PFAD/$uid
+	       echo "      modify $uid"
+#	   else
+#	       echo "             $uid"
 	   fi
+	   
        fi
-	fi
+ 
+     done < "$1"
+
+     if newusers newusers.cmd;then
+        echo "info: alles ok"
+	rm newusers.cmd
+     else
+	echo "error: nummer $?"
+     fi
 	
-       ALLE=$( echo "$ALLE"|sed -e"s/ $uid / /g") 
-    done < "$1"
-    echo "***************************"
-    echo $ALLE
-    
+	   
+	   
 
     
     
